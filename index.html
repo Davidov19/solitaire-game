@@ -3,98 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Solitaire</title>
+    <title>Classic Solitaire</title>
     <style>
         :root {
             --green: #1a5e20;
-            --card-width: clamp(50px, 11vw, 90px);
-            --card-height: calc(var(--card-width) * 1.45);
-            --radius: 6px;
+            --card-w: 80px;
+            --card-h: 112px;
         }
         body {
             background-color: var(--green);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             margin: 0;
             overflow: hidden;
             color: white;
             user-select: none;
         }
-        /* Top Navigation Bar */
         #hud {
-            background: rgba(0,0,0,0.3);
+            background: rgba(0,0,0,0.4);
             display: flex;
             justify-content: space-around;
-            align-items: center;
-            padding: 10px;
+            padding: 15px;
             font-weight: bold;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
         .btn {
-            background: #fff;
-            color: #1a5e20;
+            background: #eee;
             border: none;
-            padding: 6px 15px;
-            border-radius: 4px;
+            padding: 5px 15px;
+            border-radius: 3px;
             cursor: pointer;
             font-weight: bold;
-            transition: transform 0.1s;
         }
-        .btn:active { transform: scale(0.95); }
-
         #game-board {
-            position: relative;
-            width: 100vw;
-            height: calc(100vh - 50px);
-            padding-top: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            padding-top: 20px;
+            gap: 20px;
         }
-
-        .row { display: flex; justify-content: center; gap: 15px; width: 95%; max-width: 900px; margin-bottom: 20px; }
-
+        .row { display: flex; gap: 10px; justify-content: center; width: 100%; }
+        
+        /* Piles */
         .pile {
-            width: var(--card-width);
-            height: var(--card-height);
-            border: 2px solid rgba(255,255,255,0.15);
-            border-radius: var(--radius);
+            width: var(--card-w);
+            height: var(--card-h);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
             position: relative;
+            background: rgba(0,0,0,0.1);
         }
-
-        /* Card Styling */
+        
+        /* Cards */
         .card {
-            width: var(--card-width);
-            height: var(--card-height);
+            width: var(--card-w);
+            height: var(--card-h);
             background: white;
-            border-radius: var(--radius);
+            border-radius: 6px;
             position: absolute;
-            box-shadow: 1px 1px 3px rgba(0,0,0,0.4);
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
             color: black;
-            padding: 6px;
+            padding: 5px;
             box-sizing: border-box;
-            font-size: 1.1rem;
             display: flex;
             flex-direction: column;
-            transition: top 0.2s ease;
+            border: 1px solid #999;
+        }
+        .card.back {
+            background: #2b5797;
+            background-image: repeating-linear-gradient(45deg, #2b5797, #2b5797 5px, #3b67a7 5px, #3b67a7 10px);
+            border: 2px solid white;
         }
         .card.red { color: #d32f2f; }
-        .card.back {
-            background: #1e88e5;
-            background-image: repeating-linear-gradient(135deg, #1565c0, #1565c0 10px, #1e88e5 10px, #1e88e5 20px);
-            border: 3px solid white;
+        .suit-center {
+            font-size: 2.5rem;
+            text-align: center;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .card-suit-big {
-            align-self: center;
-            font-size: 2rem;
-            margin-top: 5px;
-        }
-
-        /* Animation Canvas */
         #victory-canvas {
             position: fixed;
             top: 0; left: 0;
             pointer-events: none;
-            z-index: 9999;
+            z-index: 1000;
         }
     </style>
 </head>
@@ -111,7 +102,8 @@
         <div class="row">
             <div id="stock" class="pile"></div>
             <div id="waste" class="pile"></div>
-            <div style="width: 20px;"></div> <div class="pile foundation" data-idx="0"></div>
+            <div style="width: 40px;"></div>
+            <div class="pile foundation" data-idx="0"></div>
             <div class="pile foundation" data-idx="1"></div>
             <div class="pile foundation" data-idx="2"></div>
             <div class="pile foundation" data-idx="3"></div>
@@ -131,131 +123,111 @@
 
 <script>
 const SUITS = ['♠', '♣', '♥', '♦'];
-const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const VALS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-class SolitaireGame {
+class Solitaire {
     constructor() {
         this.canvas = document.getElementById('victory-canvas');
         this.ctx = this.canvas.getContext('2d');
-        this.score = 0;
-        this.seconds = 0;
-        this.timerInterval = null;
         this.initGame();
     }
 
     initGame() {
-        clearInterval(this.timerInterval);
-        this.seconds = 0;
         this.score = 0;
-        this.updateHUD();
-        this.timerInterval = setInterval(() => {
-            this.seconds++;
-            document.getElementById('timer').innerText = 
-                Math.floor(this.seconds / 60) + ":" + (this.seconds % 60).toString().padStart(2, '0');
-        }, 1000);
-
-        const deck = [];
-        SUITS.forEach(suit => {
-            VALUES.forEach((val, i) => {
-                deck.push({ suit, value: val, rank: i + 1, color: (suit === '♥' || suit === '♦') ? 'red' : 'black', faceUp: false });
-            });
-        });
-        
-        // Fisher-Yates Shuffle
-        for (let i = deck.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [deck[i], deck[j]] = [deck[j], deck[i]];
-        }
-
-        this.stock = deck;
+        this.seconds = 0;
+        this.stock = [];
         this.waste = [];
-        this.foundations = [[], [], [], []];
-        this.tableau = Array.from({length: 7}, () => []);
+        this.foundations = [[],[],[],[]];
+        this.tableau = [[],[],[],[],[],[],[]];
         
-        for (let i = 0; i < 7; i++) {
-            for (let j = i; j < 7; j++) {
-                const card = this.stock.pop();
-                if (i === j) card.faceUp = true;
+        let deck = [];
+        SUITS.forEach(s => VALS.forEach((v, i) => {
+            deck.push({ suit: s, val: v, rank: i+1, color: (s==='♥'||s==='♦')?'red':'black', faceUp: false });
+        }));
+        
+        deck.sort(() => Math.random() - 0.5);
+
+        for(let i=0; i<7; i++) {
+            for(let j=i; j<7; j++) {
+                let card = deck.pop();
+                if(i === j) card.faceUp = true;
                 this.tableau[j].push(card);
             }
         }
+        this.stock = deck;
         this.render();
-    }
-
-    updateHUD() {
-        document.getElementById('score').innerText = this.score;
+        
+        if(this.timer) clearInterval(this.timer);
+        this.timer = setInterval(() => {
+            this.seconds++;
+            let m = Math.floor(this.seconds/60);
+            let s = (this.seconds%60).toString().padStart(2,'0');
+            document.getElementById('timer').innerText = `${m}:${s}`;
+        }, 1000);
     }
 
     render() {
-        this.renderPile('stock', this.stock, 'stock');
-        this.renderPile('waste', this.waste, 'waste');
-        this.foundations.forEach((f, i) => this.renderPile(`.foundation[data-idx="${i}"]`, f, 'foundation', i));
-        this.tableau.forEach((t, i) => this.renderPile(`.tableau[data-idx="${i}"]`, t, 'tableau', i));
+        document.getElementById('score').innerText = this.score;
+        this.drawPile('#stock', this.stock, 'stock');
+        this.drawPile('#waste', this.waste, 'waste');
+        this.foundations.forEach((f, i) => this.drawPile(`.foundation[data-idx="${i}"]`, f, 'foundation', i));
+        this.tableau.forEach((t, i) => this.drawPile(`.tableau[data-idx="${i}"]`, t, 'tableau', i));
     }
 
-    renderPile(selector, cards, type, pileIdx) {
-        const container = document.querySelector(selector);
-        container.innerHTML = '';
-        
-        cards.forEach((card, i) => {
-            const cardEl = document.createElement('div');
-            cardEl.className = `card ${card.faceUp ? card.color : 'back'}`;
-            if (card.faceUp) {
-                cardEl.innerHTML = `<span>${card.value}${card.suit}</span><span class="card-suit-big">${card.suit}</span>`;
-                this.addDragEvents(cardEl, card, type, pileIdx, i);
-                cardEl.ondblclick = () => this.autoMove(card, type, pileIdx);
+    drawPile(sel, cards, type, pIdx) {
+        const el = document.querySelector(sel);
+        el.innerHTML = '';
+        cards.forEach((c, i) => {
+            const div = document.createElement('div');
+            div.className = `card ${c.faceUp ? c.color : 'back'}`;
+            if(c.faceUp) {
+                div.innerHTML = `<div>${c.val}${c.suit}</div><div class="suit-center">${c.suit}</div>`;
+                div.draggable = true;
+                div.ondragstart = () => {
+                    this.dragging = type === 'tableau' ? cards.slice(i) : [c];
+                    this.source = { type, pIdx };
+                };
+                div.ondblclick = () => this.autoMove(c, type, pIdx);
             }
-            if (type === 'tableau') cardEl.style.top = `${i * 25}px`;
-            container.appendChild(cardEl);
+            if(type === 'tableau') div.style.top = `${i * 20}px`;
+            el.appendChild(div);
         });
-
-        container.ondragover = (e) => e.preventDefault();
-        container.ondrop = (e) => this.handleDrop(type, pileIdx);
+        el.ondragover = e => e.preventDefault();
+        el.ondrop = () => this.handleDrop(type, pIdx);
     }
 
-    addDragEvents(el, card, type, pIdx, cIdx) {
-        el.draggable = true;
-        el.ondragstart = () => {
-            this.draggedCards = type === 'tableau' ? this.tableau[pIdx].slice(cIdx) : [card];
-            this.dragSource = { type, index: pIdx };
-        };
-    }
+    handleDrop(type, pIdx) {
+        if(!this.dragging) return;
+        const c = this.dragging[0];
+        let ok = false;
 
-    handleDrop(destType, destIdx) {
-        if (!this.draggedCards) return;
-        const card = this.draggedCards[0];
-        let valid = false;
-
-        if (destType === 'foundation' && this.draggedCards.length === 1) {
-            const f = this.foundations[destIdx];
-            valid = f.length === 0 ? card.rank === 1 : (card.suit === f[f.length-1].suit && card.rank === f[f.length-1].rank + 1);
-            if (valid) this.score += 10;
-        } else if (destType === 'tableau') {
-            const t = this.tableau[destIdx];
-            valid = t.length === 0 ? card.rank === 13 : (card.color !== t[t.length-1].color && card.rank === t[t.length-1].rank - 1);
-            if (valid && this.dragSource.type === 'waste') this.score += 5;
+        if(type === 'foundation' && this.dragging.length === 1) {
+            const f = this.foundations[pIdx];
+            ok = f.length === 0 ? c.rank === 1 : (c.suit === f[f.length-1].suit && c.rank === f[f.length-1].rank + 1);
+        } else if(type === 'tableau') {
+            const t = this.tableau[pIdx];
+            ok = t.length === 0 ? c.rank === 13 : (c.color !== t[t.length-1].color && c.rank === t[t.length-1].rank - 1);
         }
 
-        if (valid) {
-            const src = this.dragSource.type === 'tableau' ? this.tableau[this.dragSource.index] : this.waste;
-            const moved = src.splice(src.length - this.draggedCards.length);
-            (destType === 'tableau' ? this.tableau[destIdx] : this.foundations[destIdx]).push(...moved);
-            if (src.length > 0 && !src[src.length-1].faceUp) {
-                src[src.length-1].faceUp = true;
-                this.score += 5;
+        if(ok) {
+            const src = this.source.type === 'tableau' ? this.tableau[this.source.pIdx] : this.waste;
+            const moved = src.splice(src.length - this.dragging.length);
+            (type === 'tableau' ? this.tableau[pIdx] : this.foundations[pIdx]).push(...moved);
+            if(src.length > 0) { 
+                if(!src[src.length-1].faceUp) this.score += 5;
+                src[src.length-1].faceUp = true; 
             }
+            this.score += (type === 'foundation' ? 10 : 5);
             this.render();
             this.checkWin();
         }
     }
 
-    autoMove(card, type, pIdx) {
-        for (let i = 0; i < 4; i++) {
+    autoMove(c, type, pIdx) {
+        for(let i=0; i<4; i++) {
             const f = this.foundations[i];
-            const valid = f.length === 0 ? card.rank === 1 : (card.suit === f[f.length-1].suit && card.rank === f[f.length-1].rank + 1);
-            if (valid) {
-                this.draggedCards = [card];
-                this.dragSource = { type, index: pIdx };
+            if((f.length===0 && c.rank===1) || (f.length>0 && c.suit===f[f.length-1].suit && c.rank===f[f.length-1].rank+1)) {
+                this.dragging = [c]; this.source = {type, pIdx};
                 this.handleDrop('foundation', i);
                 break;
             }
@@ -263,48 +235,14 @@ class SolitaireGame {
     }
 
     checkWin() {
-        if (this.foundations.every(f => f.length === 13)) {
-            this.winAnimation();
-        }
+        if(this.foundations.every(f => f.length === 13)) this.winAnim();
     }
 
-    winAnimation() {
-        clearInterval(this.timerInterval);
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-        const cards = [];
-        this.foundations.flat().forEach(c => cards.push({...c, x: Math.random()*800, y: 100, vx: (Math.random()-0.5)*10, vy: 2}));
-
-        const animate = () => {
+    winAnim() {
+        this.canvas.width = window.innerWidth; this.canvas.height = window.innerHeight;
+        let cards = [];
+        this.foundations.flat().forEach(c => cards.push({...c, x: Math.random()*this.canvas.width, y: 100, vx: (Math.random()-0.5)*15, vy: 2}));
+        const loop = () => {
             this.ctx.clearRect(0,0,this.canvas.width, this.canvas.height);
             cards.forEach(c => {
-                c.x += c.vx; c.y += c.vy; c.vy += 0.5;
-                if (c.y > this.canvas.height - 100) { c.y = this.canvas.height - 100; c.vy *= -0.8; }
-                if (c.x < 0 || c.x > this.canvas.width) c.vx *= -1;
-                
-                this.ctx.fillStyle = "white";
-                this.ctx.fillRect(c.x, c.y, 80, 110);
-                this.ctx.fillStyle = c.color;
-                this.ctx.fillText(c.value + c.suit, c.x + 5, c.y + 20);
-            });
-            requestAnimationFrame(animate);
-        };
-        animate();
-    }
-}
-
-const game = new SolitaireGame();
-
-document.getElementById('stock').onclick = () => {
-    if (game.stock.length) {
-        const c = game.stock.pop(); c.faceUp = true;
-        game.waste.push(c);
-    } else {
-        game.stock = game.waste.map(c => ({...c, faceUp: false})).reverse();
-        game.waste = [];
-    }
-    game.render();
-};
-</script>
-</body>
-</html>
+                c.x += c.vx; c.y += c.vy; c.vy += 0
