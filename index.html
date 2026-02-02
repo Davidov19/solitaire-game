@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Classic Solitaire</title>
+    <title>Classic Solitaire + Undo</title>
     <style>
         :root {
             --green: #1a5e20;
@@ -14,85 +14,89 @@
             background-color: var(--green);
             font-family: 'Segoe UI', sans-serif;
             margin: 0;
-            overflow: hidden;
+            overflow-x: hidden;
             color: white;
             user-select: none;
         }
         #hud {
-            background: rgba(0,0,0,0.4);
+            background: rgba(0,0,0,0.5);
             display: flex;
             justify-content: space-around;
-            padding: 15px;
-            font-weight: bold;
+            align-items: center;
+            padding: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
+        .controls { display: flex; gap: 10px; }
         .btn {
-            background: #eee;
+            background: #ffffff;
+            color: #1a5e20;
             border: none;
-            padding: 5px 15px;
-            border-radius: 3px;
+            padding: 6px 14px;
+            border-radius: 4px;
             cursor: pointer;
             font-weight: bold;
+            font-size: 0.9rem;
+            transition: background 0.2s;
         }
+        .btn:hover { background: #e0e0e0; }
+        .btn:disabled { background: #888; color: #ccc; cursor: not-allowed; }
+
         #game-board {
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding-top: 20px;
-            gap: 20px;
+            padding-top: 30px;
+            gap: 25px;
         }
-        .row { display: flex; gap: 10px; justify-content: center; width: 100%; }
+        .row { display: flex; gap: 12px; justify-content: center; width: 100%; }
         
-        /* Piles */
         .pile {
             width: var(--card-w);
             height: var(--card-h);
-            border: 2px solid rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.15);
             border-radius: 6px;
             position: relative;
-            background: rgba(0,0,0,0.1);
+            background: rgba(0,0,0,0.05);
         }
         
-        /* Cards */
         .card {
             width: var(--card-w);
             height: var(--card-h);
             background: white;
             border-radius: 6px;
             position: absolute;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            box-shadow: 1px 1px 4px rgba(0,0,0,0.4);
             color: black;
-            padding: 5px;
+            padding: 6px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            border: 1px solid #999;
+            border: 1px solid #ccc;
         }
         .card.back {
             background: #2b5797;
-            background-image: repeating-linear-gradient(45deg, #2b5797, #2b5797 5px, #3b67a7 5px, #3b67a7 10px);
+            background-image: repeating-linear-gradient(135deg, #2b5797, #2b5797 6px, #3b67a7 6px, #3b67a7 12px);
             border: 2px solid white;
         }
         .card.red { color: #d32f2f; }
         .suit-center {
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             text-align: center;
             flex-grow: 1;
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        #victory-canvas {
-            position: fixed;
-            top: 0; left: 0;
-            pointer-events: none;
-            z-index: 1000;
-        }
+        canvas { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 1000; }
     </style>
 </head>
 <body>
 
     <div id="hud">
-        <button class="btn" onclick="game.initGame()">New Game</button>
+        <div class="controls">
+            <button class="btn" onclick="game.initGame()">New Game</button>
+            <button class="btn" id="undoBtn" onclick="game.undo()">Undo</button>
+        </div>
         <div>Score: <span id="score">0</span></div>
         <div>Time: <span id="timer">0:00</span></div>
         <button class="btn" onclick="location.reload()">Restart</button>
@@ -127,26 +131,50 @@ const VALS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 class Solitaire {
     constructor() {
+        this.history = [];
         this.canvas = document.getElementById('victory-canvas');
         this.ctx = this.canvas.getContext('2d');
         this.initGame();
     }
 
+    saveState() {
+        const state = JSON.stringify({
+            stock: this.stock,
+            waste: this.waste,
+            foundations: this.foundations,
+            tableau: this.tableau,
+            score: this.score
+        });
+        this.history.push(state);
+        document.getElementById('undoBtn').disabled = false;
+    }
+
+    undo() {
+        if (this.history.length === 0) return;
+        const state = JSON.parse(this.history.pop());
+        this.stock = state.stock;
+        this.waste = state.waste;
+        this.foundations = state.foundations;
+        this.tableau = state.tableau;
+        this.score = Math.max(0, state.score - 2); // Small penalty for undoing
+        this.render();
+        if (this.history.length === 0) document.getElementById('undoBtn').disabled = true;
+    }
+
     initGame() {
+        this.history = [];
+        document.getElementById('undoBtn').disabled = true;
         this.score = 0;
         this.seconds = 0;
-        this.stock = [];
-        this.waste = [];
-        this.foundations = [[],[],[],[]];
-        this.tableau = [[],[],[],[],[],[],[]];
         
         let deck = [];
         SUITS.forEach(s => VALS.forEach((v, i) => {
             deck.push({ suit: s, val: v, rank: i+1, color: (s==='♥'||s==='♦')?'red':'black', faceUp: false });
         }));
-        
         deck.sort(() => Math.random() - 0.5);
 
+        this.foundations = [[],[],[],[]];
+        this.tableau = [[],[],[],[],[],[],[]];
         for(let i=0; i<7; i++) {
             for(let j=i; j<7; j++) {
                 let card = deck.pop();
@@ -155,6 +183,7 @@ class Solitaire {
             }
         }
         this.stock = deck;
+        this.waste = [];
         this.render();
         
         if(this.timer) clearInterval(this.timer);
@@ -187,7 +216,10 @@ class Solitaire {
                     this.dragging = type === 'tableau' ? cards.slice(i) : [c];
                     this.source = { type, pIdx };
                 };
-                div.ondblclick = () => this.autoMove(c, type, pIdx);
+                div.ondblclick = (e) => {
+                    e.stopPropagation();
+                    this.autoMove(c, type, pIdx);
+                };
             }
             if(type === 'tableau') div.style.top = `${i * 20}px`;
             el.appendChild(div);
@@ -210,17 +242,20 @@ class Solitaire {
         }
 
         if(ok) {
+            this.saveState();
             const src = this.source.type === 'tableau' ? this.tableau[this.source.pIdx] : this.waste;
             const moved = src.splice(src.length - this.dragging.length);
             (type === 'tableau' ? this.tableau[pIdx] : this.foundations[pIdx]).push(...moved);
-            if(src.length > 0) { 
-                if(!src[src.length-1].faceUp) this.score += 5;
-                src[src.length-1].faceUp = true; 
+            
+            if(src.length > 0 && !src[src.length-1].faceUp) {
+                src[src.length-1].faceUp = true;
+                this.score += 5;
             }
             this.score += (type === 'foundation' ? 10 : 5);
             this.render();
             this.checkWin();
         }
+        this.dragging = null;
     }
 
     autoMove(c, type, pIdx) {
@@ -229,7 +264,7 @@ class Solitaire {
             if((f.length===0 && c.rank===1) || (f.length>0 && c.suit===f[f.length-1].suit && c.rank===f[f.length-1].rank+1)) {
                 this.dragging = [c]; this.source = {type, pIdx};
                 this.handleDrop('foundation', i);
-                break;
+                return;
             }
         }
     }
@@ -245,4 +280,30 @@ class Solitaire {
         const loop = () => {
             this.ctx.clearRect(0,0,this.canvas.width, this.canvas.height);
             cards.forEach(c => {
-                c.x += c.vx; c.y += c.vy; c.vy += 0
+                c.x += c.vx; c.y += c.vy; c.vy += 0.5;
+                if(c.y > this.canvas.height-112) { c.y = this.canvas.height-112; c.vy *= -0.85; }
+                if(c.x < 0 || c.x > this.canvas.width-80) c.vx *= -1;
+                this.ctx.fillStyle = "white"; this.ctx.fillRect(c.x, c.y, 80, 112);
+                this.ctx.fillStyle = c.color; this.ctx.font = "16px Arial"; this.ctx.fillText(c.val + c.suit, c.x+5, c.y+20);
+            });
+            requestAnimationFrame(loop);
+        };
+        loop();
+    }
+}
+
+const game = new Solitaire();
+
+document.getElementById('stock').onclick = () => {
+    game.saveState();
+    if(game.stock.length) {
+        let c = game.stock.pop(); c.faceUp = true; game.waste.push(c);
+    } else {
+        game.stock = game.waste.map(c => ({...c, faceUp: false})).reverse();
+        game.waste = [];
+    }
+    game.render();
+};
+</script>
+</body>
+</html>
