@@ -1,235 +1,172 @@
-/* =========================================================
-   MOBILE SUPPORT + AUTO MOVE + AUTO COMPLETE (SINGLE BLOCK)
-   ========================================================= */
-
-// ---------- Device Detection ----------
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-// ---------- Constructor Additions ----------
-this.selectedCards = null;
-this.selectedSource = null;
-this.longPressTimer = null;
-this.touchDragging = false;
-this.autoCompleteTimer = null;
+class SolitaireGame {
+    constructor() {
+        this.stock = [];
+        this.waste = [];
+        this.tableau = Array.from({ length: 7 }, () => []);
+        this.foundations = Array.from({ length: 4 }, () => []);
 
-// ---------- AUTO MOVE HELPER ----------
-this.autoMoveCard = function (card, sourceType, sourceIndex) {
-    // Foundations first
-    for (let i = 0; i < 4; i++) {
-        if (this.canPlaceOnFoundation(card, i)) {
-            return this.moveCards(
-                [card],
-                sourceType,
-                sourceIndex,
-                'foundation',
-                i
-            );
+        this.draggedCards = null;
+        this.dragSource = null;
+
+        // Mobile / auto-complete state
+        this.longPressTimer = null;
+        this.touchDragging = false;
+        this.autoCompleteTimer = null;
+
+        this.initGame();
+    }
+
+    /* ===================== AUTO MOVE ===================== */
+    autoMoveCard(card, sourceType, sourceIndex) {
+        for (let i = 0; i < 4; i++) {
+            if (this.canPlaceOnFoundation(card, i)) {
+                this.moveCards([card], sourceType, sourceIndex, 'foundation', i);
+                return true;
+            }
         }
-    }
 
-    // Best tableau fit
-    for (let i = 0; i < 7; i++) {
-        if (this.canPlaceOnTableau(card, i)) {
-            return this.moveCards(
-                [card],
-                sourceType,
-                sourceIndex,
-                'tableau',
-                i
-            );
+        for (let i = 0; i < 7; i++) {
+            if (this.canPlaceOnTableau(card, i)) {
+                this.moveCards([card], sourceType, sourceIndex, 'tableau', i);
+                return true;
+            }
         }
+        return false;
     }
-    return false;
-};
 
-// ---------- AUTO COMPLETE CHECK ----------
-this.canAutoComplete = function () {
-    if (this.stock.length > 0 || this.waste.length > 0) return false;
-
-    // All tableau cards must be face-up
-    for (let pile of this.tableau) {
-        if (pile.some(c => !c.faceUp)) return false;
+    /* ===================== AUTO COMPLETE ===================== */
+    canAutoComplete() {
+        if (this.stock.length || this.waste.length) return false;
+        return this.tableau.every(p => p.every(c => c.faceUp));
     }
-    return true;
-};
 
-// ---------- AUTO COMPLETE ENGINE ----------
-this.startAutoComplete = function () {
-    if (!this.canAutoComplete() || this.autoCompleteTimer) return;
+    startAutoComplete() {
+        if (!this.canAutoComplete() || this.autoCompleteTimer) return;
 
-    this.autoCompleteTimer = setInterval(() => {
-        let moved = false;
+        this.autoCompleteTimer = setInterval(() => {
+            let moved = false;
 
-        for (let t = 0; t < 7; t++) {
-            const pile = this.tableau[t];
-            if (!pile.length) continue;
+            for (let t = 0; t < 7 && !moved; t++) {
+                const pile = this.tableau[t];
+                if (!pile.length) continue;
 
-            const card = pile[pile.length - 1];
-            for (let f = 0; f < 4; f++) {
-                if (this.canPlaceOnFoundation(card, f)) {
-                    this.moveCards([card], 'tableau', t, 'foundation', f);
-                    moved = true;
-                    break;
+                const card = pile[pile.length - 1];
+                for (let f = 0; f < 4; f++) {
+                    if (this.canPlaceOnFoundation(card, f)) {
+                        this.moveCards([card], 'tableau', t, 'foundation', f);
+                        moved = true;
+                        break;
+                    }
                 }
             }
-            if (moved) break;
+
+            if (!moved) {
+                clearInterval(this.autoCompleteTimer);
+                this.autoCompleteTimer = null;
+            }
+
+            this.render();
+            this.updateStats();
+        }, 250);
+    }
+
+    /* ===================== CARD INTERACTION ===================== */
+    addCardInteraction(cardEl, card, sourceType, sourceIndex) {
+
+        // ---------- DESKTOP ----------
+        if (!IS_TOUCH) {
+            cardEl.draggable = true;
+
+            cardEl.addEventListener('dragstart', () => {
+                const idx = Number(cardEl.dataset.cardIndex) || 0;
+                this.draggedCards =
+                    sourceType === 'tableau'
+                        ? this.tableau[sourceIndex].slice(idx)
+                        : [card];
+                this.dragSource = { type: sourceType, index: sourceIndex };
+                cardEl.classList.add('dragging');
+            });
+
+            cardEl.addEventListener('dragend', () => {
+                cardEl.classList.remove('dragging');
+                this.draggedCards = null;
+                this.dragSource = null;
+            });
+
+            cardEl.addEventListener('dblclick', () => {
+                if (this.autoMoveCard(card, sourceType, sourceIndex)) {
+                    this.render();
+                    this.updateStats();
+                    this.startAutoComplete();
+                }
+            });
+            return;
         }
 
-        if (!moved) {
-            clearInterval(this.autoCompleteTimer);
-            this.autoCompleteTimer = null;
-        }
-
-        this.render();
-        this.updateStats();
-    }, 250);
-};
-
-// ---------- CARD INTERACTION (REPLACE ENTIRE METHOD) ----------
-this.addCardInteraction = function (cardEl, card, sourceType, sourceIndex) {
-
-    // ===== DESKTOP =====
-    if (!IS_TOUCH) {
-        cardEl.draggable = true;
-
-        cardEl.addEventListener('dragstart', (e) => {
-            const idx = parseInt(cardEl.dataset.cardIndex) || 0;
-            this.draggedCards =
-                sourceType === 'tableau'
-                    ? this.tableau[sourceIndex].slice(idx)
-                    : [card];
-            this.dragSource = { type: sourceType, index: sourceIndex };
-            cardEl.classList.add('dragging');
-        });
-
-        cardEl.addEventListener('dragend', () => {
-            cardEl.classList.remove('dragging');
-            this.draggedCards = null;
-            this.dragSource = null;
-        });
-
-        cardEl.addEventListener('dblclick', () => {
+        // ---------- MOBILE ----------
+        cardEl.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (this.autoMoveCard(card, sourceType, sourceIndex)) {
                 this.render();
                 this.updateStats();
                 this.startAutoComplete();
             }
         });
-        return;
-    }
 
-    // ===== MOBILE =====
-    cardEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (this.autoMoveCard(card, sourceType, sourceIndex)) {
-            this.render();
-            this.updateStats();
-            this.startAutoComplete();
-        }
-    });
-
-    cardEl.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const touch = e.touches[0];
-        const startX = touch.clientX;
-        const startY = touch.clientY;
-        const idx = parseInt(cardEl.dataset.cardIndex) || 0;
-
-        this.longPressTimer = setTimeout(() => {
-            this.touchDragging = true;
-            this.draggedCards =
-                sourceType === 'tableau'
-                    ? this.tableau[sourceIndex].slice(idx)
-                    : [card];
-            this.dragSource = { type: sourceType, index: sourceIndex };
-            cardEl.classList.add('dragging');
-        }, 350);
-
-        const move = (me) => {
-            if (!this.touchDragging) return;
-            const t = me.touches[0];
-            cardEl.style.transform =
-                `translate(${t.clientX - startX}px, ${t.clientY - startY}px) scale(1.05)`;
-            cardEl.style.zIndex = 999;
-        };
-
-        const end = () => {
-            clearTimeout(this.longPressTimer);
-            cardEl.style.transform = '';
-            cardEl.style.zIndex = '';
-            cardEl.classList.remove('dragging');
-            this.touchDragging = false;
-            this.draggedCards = null;
-            this.dragSource = null;
-            document.removeEventListener('touchmove', move);
-            document.removeEventListener('touchend', end);
-        };
-
-        document.addEventListener('touchmove', move);
-        document.addEventListener('touchend', end);
-    });
-};
-
-// ---------- DROP ZONE (REPLACE ENTIRE METHOD) ----------
-this.addDropZone = function (el, destType, destIndex) {
-
-    const attemptDrop = () => {
-        if (!this.draggedCards || !this.dragSource) return;
-        const card = this.draggedCards[0];
-
-        let valid = false;
-        if (destType === 'foundation' && this.draggedCards.length === 1) {
-            valid = this.canPlaceOnFoundation(card, destIndex);
-        } else if (destType === 'tableau') {
-            valid = this.tableau[destIndex].length === 0
-                ? card.rank === 'K'
-                : this.canPlaceOnTableau(card, destIndex);
-        }
-
-        if (valid) {
-            this.moveCards(
-                this.draggedCards,
-                this.dragSource.type,
-                this.dragSource.index,
-                destType,
-                destIndex
-            );
-            this.render();
-            this.updateStats();
-            this.startAutoComplete();
-        }
-
-        this.draggedCards = null;
-        this.dragSource = null;
-    };
-
-    if (!IS_TOUCH) {
-        el.addEventListener('dragover', e => e.preventDefault());
-        el.addEventListener('drop', e => {
+        cardEl.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            attemptDrop();
-        });
-    } else {
-        el.addEventListener('touchend', attemptDrop);
-    }
-};
 
-// ---------- MOBILE CSS (ADD TO <style>) ----------
-/*
-@media (max-width: 900px) {
-    .card {
-        width: 64px;
-        height: 90px;
-        font-size: 14px;
-        touch-action: none;
+            const idx = Number(cardEl.dataset.cardIndex) || 0;
+            const touch = e.touches[0];
+            const startX = touch.clientX;
+            const startY = touch.clientY;
+
+            this.longPressTimer = setTimeout(() => {
+                this.touchDragging = true;
+                this.draggedCards =
+                    sourceType === 'tableau'
+                        ? this.tableau[sourceIndex].slice(idx)
+                        : [card];
+                this.dragSource = { type: sourceType, index: sourceIndex };
+                cardEl.classList.add('dragging');
+            }, 350);
+
+            const move = (me) => {
+                if (!this.touchDragging) return;
+                const t = me.touches[0];
+                cardEl.style.transform =
+                    `translate(${t.clientX - startX}px, ${t.clientY - startY}px) scale(1.05)`;
+                cardEl.style.zIndex = 999;
+            };
+
+            const end = () => {
+                clearTimeout(this.longPressTimer);
+                cardEl.style.transform = '';
+                cardEl.style.zIndex = '';
+                cardEl.classList.remove('dragging');
+                this.touchDragging = false;
+                this.draggedCards = null;
+                this.dragSource = null;
+                document.removeEventListener('touchmove', move);
+                document.removeEventListener('touchend', end);
+            };
+
+            document.addEventListener('touchmove', move);
+            document.addEventListener('touchend', end);
+        });
     }
-    body {
-        overflow: hidden;
-        touch-action: manipulation;
-    }
-    .card.dragging {
-        opacity: 0.85;
-        transform: scale(1.05);
-    }
-}
-*/
+
+    /* ===================== DROP ZONES ===================== */
+    addDropZone(el, destType, destIndex) {
+        const attemptDrop = () => {
+            if (!this.draggedCards || !this.dragSource) return;
+
+            const card = this.draggedCards[0];
+            let valid = false;
+
+            if (destType === 'foundation' && this.draggedCards.length === 1) {
+                valid = this.canPlaceOnFoundation(card, destIndex);
+            } else if (destType === 'tableau') {
+                valid = this.tableau[destIndex].length === 0
