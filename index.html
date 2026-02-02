@@ -2,91 +2,109 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Classic Solitaire + Undo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile-First Solitaire</title>
     <style>
         :root {
             --green: #1a5e20;
-            --card-w: 80px;
-            --card-h: 112px;
+            /* Adaptive card sizing based on 7 columns minus gaps */
+            --card-w: calc((100vw - 60px) / 7);
+            --card-h: calc(var(--card-w) * 1.4);
+            --gap: 6px;
         }
         body {
             background-color: var(--green);
-            font-family: 'Segoe UI', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
+            padding: 0;
             overflow-x: hidden;
             color: white;
             user-select: none;
+            touch-action: manipulation;
         }
+
+        /* Stats Bar */
         #hud {
-            background: rgba(0,0,0,0.5);
-            display: flex;
-            justify-content: space-around;
+            background: rgba(0,0,0,0.8);
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
             align-items: center;
-            padding: 12px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            padding: 10px 5px;
+            font-size: 0.8rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 2000;
         }
-        .controls { display: flex; gap: 10px; }
+
+        .controls { display: flex; gap: 4px; justify-content: center; }
         .btn {
-            background: #ffffff;
+            background: #fff;
             color: #1a5e20;
             border: none;
-            padding: 6px 14px;
+            padding: 5px 8px;
             border-radius: 4px;
-            cursor: pointer;
+            font-size: 0.75rem;
             font-weight: bold;
-            font-size: 0.9rem;
-            transition: background 0.2s;
         }
-        .btn:hover { background: #e0e0e0; }
-        .btn:disabled { background: #888; color: #ccc; cursor: not-allowed; }
 
+        /* The Board Grid */
         #game-board {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding-top: 30px;
-            gap: 25px;
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: var(--gap);
+            padding: 15px 8px;
+            max-width: 1000px;
+            margin: 0 auto;
         }
-        .row { display: flex; gap: 12px; justify-content: center; width: 100%; }
-        
+
         .pile {
             width: var(--card-w);
             height: var(--card-h);
-            border: 2px solid rgba(255,255,255,0.15);
-            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px;
             position: relative;
-            background: rgba(0,0,0,0.05);
+            background: rgba(0,0,0,0.1);
         }
-        
+
+        /* Card Styling */
         .card {
             width: var(--card-w);
             height: var(--card-h);
             background: white;
-            border-radius: 6px;
+            border-radius: 4px;
             position: absolute;
-            box-shadow: 1px 1px 4px rgba(0,0,0,0.4);
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.4);
             color: black;
-            padding: 6px;
+            padding: 3px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            border: 1px solid #ccc;
+            border: 0.5px solid #ccc;
+            font-size: 0.7rem;
+            line-height: 1;
         }
+        
         .card.back {
             background: #2b5797;
-            background-image: repeating-linear-gradient(135deg, #2b5797, #2b5797 6px, #3b67a7 6px, #3b67a7 12px);
-            border: 2px solid white;
+            background-image: repeating-linear-gradient(135deg, #2b5797, #2b5797 4px, #3b67a7 4px, #3b67a7 8px);
+            border: 1.5px solid white;
         }
+
         .card.red { color: #d32f2f; }
+        
         .suit-center {
-            font-size: 2.2rem;
+            font-size: 1.4rem;
             text-align: center;
             flex-grow: 1;
             display: flex;
             align-items: center;
             justify-content: center;
         }
+
+        /* Tableau Stack Spacing */
+        .tableau-stack { grid-row: 2; margin-top: 10px; }
+        
         canvas { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 1000; }
     </style>
 </head>
@@ -94,33 +112,29 @@
 
     <div id="hud">
         <div class="controls">
-            <button class="btn" onclick="game.initGame()">New Game</button>
+            <button class="btn" onclick="game.initGame()">New</button>
             <button class="btn" id="undoBtn" onclick="game.undo()">Undo</button>
         </div>
-        <div>Score: <span id="score">0</span></div>
-        <div>Time: <span id="timer">0:00</span></div>
-        <button class="btn" onclick="location.reload()">Restart</button>
+        <div><b>Score:</b> <span id="score">0</span></div>
+        <div><b>Time:</b> <span id="timer">0:00</span></div>
     </div>
 
     <div id="game-board">
-        <div class="row">
-            <div id="stock" class="pile"></div>
-            <div id="waste" class="pile"></div>
-            <div style="width: 40px;"></div>
-            <div class="pile foundation" data-idx="0"></div>
-            <div class="pile foundation" data-idx="1"></div>
-            <div class="pile foundation" data-idx="2"></div>
-            <div class="pile foundation" data-idx="3"></div>
-        </div>
-        <div class="row">
-            <div class="pile tableau" data-idx="0"></div>
-            <div class="pile tableau" data-idx="1"></div>
-            <div class="pile tableau" data-idx="2"></div>
-            <div class="pile tableau" data-idx="3"></div>
-            <div class="pile tableau" data-idx="4"></div>
-            <div class="pile tableau" data-idx="5"></div>
-            <div class="pile tableau" data-idx="6"></div>
-        </div>
+        <div id="stock" class="pile"></div>
+        <div id="waste" class="pile"></div>
+        <div class="spacer"></div>
+        <div class="pile foundation" data-idx="0"></div>
+        <div class="pile foundation" data-idx="1"></div>
+        <div class="pile foundation" data-idx="2"></div>
+        <div class="pile foundation" data-idx="3"></div>
+
+        <div class="pile tableau-stack" data-idx="0"></div>
+        <div class="pile tableau-stack" data-idx="1"></div>
+        <div class="pile tableau-stack" data-idx="2"></div>
+        <div class="pile tableau-stack" data-idx="3"></div>
+        <div class="pile tableau-stack" data-idx="4"></div>
+        <div class="pile tableau-stack" data-idx="5"></div>
+        <div class="pile tableau-stack" data-idx="6"></div>
     </div>
 
     <canvas id="victory-canvas"></canvas>
@@ -146,7 +160,6 @@ class Solitaire {
             score: this.score
         });
         this.history.push(state);
-        document.getElementById('undoBtn').disabled = false;
     }
 
     undo() {
@@ -156,17 +169,14 @@ class Solitaire {
         this.waste = state.waste;
         this.foundations = state.foundations;
         this.tableau = state.tableau;
-        this.score = Math.max(0, state.score - 2); // Small penalty for undoing
+        this.score = state.score;
         this.render();
-        if (this.history.length === 0) document.getElementById('undoBtn').disabled = true;
     }
 
     initGame() {
         this.history = [];
-        document.getElementById('undoBtn').disabled = true;
         this.score = 0;
         this.seconds = 0;
-        
         let deck = [];
         SUITS.forEach(s => VALS.forEach((v, i) => {
             deck.push({ suit: s, val: v, rank: i+1, color: (s==='♥'||s==='♦')?'red':'black', faceUp: false });
@@ -189,9 +199,7 @@ class Solitaire {
         if(this.timer) clearInterval(this.timer);
         this.timer = setInterval(() => {
             this.seconds++;
-            let m = Math.floor(this.seconds/60);
-            let s = (this.seconds%60).toString().padStart(2,'0');
-            document.getElementById('timer').innerText = `${m}:${s}`;
+            document.getElementById('timer').innerText = Math.floor(this.seconds/60) + ":" + (this.seconds%60).toString().padStart(2,'0');
         }, 1000);
     }
 
@@ -200,7 +208,7 @@ class Solitaire {
         this.drawPile('#stock', this.stock, 'stock');
         this.drawPile('#waste', this.waste, 'waste');
         this.foundations.forEach((f, i) => this.drawPile(`.foundation[data-idx="${i}"]`, f, 'foundation', i));
-        this.tableau.forEach((t, i) => this.drawPile(`.tableau[data-idx="${i}"]`, t, 'tableau', i));
+        this.tableau.forEach((t, i) => this.drawPile(`.tableau-stack[data-idx="${i}"]`, t, 'tableau', i));
     }
 
     drawPile(sel, cards, type, pIdx) {
@@ -212,16 +220,14 @@ class Solitaire {
             if(c.faceUp) {
                 div.innerHTML = `<div>${c.val}${c.suit}</div><div class="suit-center">${c.suit}</div>`;
                 div.draggable = true;
-                div.ondragstart = () => {
-                    this.dragging = type === 'tableau' ? cards.slice(i) : [c];
-                    this.source = { type, pIdx };
-                };
-                div.ondblclick = (e) => {
-                    e.stopPropagation();
-                    this.autoMove(c, type, pIdx);
+                div.ondragstart = () => { this.dragging = type === 'tableau' ? cards.slice(i) : [c]; this.source = { type, pIdx }; };
+                // Double tap / click to auto-move
+                div.onclick = (e) => {
+                    if (this.lastClick && Date.now() - this.lastClick < 300) this.autoMove(c, type, pIdx);
+                    this.lastClick = Date.now();
                 };
             }
-            if(type === 'tableau') div.style.top = `${i * 20}px`;
+            if(type === 'tableau') div.style.top = `${i * (window.innerWidth < 500 ? 15 : 20)}px`;
             el.appendChild(div);
         });
         el.ondragover = e => e.preventDefault();
@@ -246,11 +252,7 @@ class Solitaire {
             const src = this.source.type === 'tableau' ? this.tableau[this.source.pIdx] : this.waste;
             const moved = src.splice(src.length - this.dragging.length);
             (type === 'tableau' ? this.tableau[pIdx] : this.foundations[pIdx]).push(...moved);
-            
-            if(src.length > 0 && !src[src.length-1].faceUp) {
-                src[src.length-1].faceUp = true;
-                this.score += 5;
-            }
+            if(src.length > 0 && !src[src.length-1].faceUp) { src[src.length-1].faceUp = true; this.score += 5; }
             this.score += (type === 'foundation' ? 10 : 5);
             this.render();
             this.checkWin();
@@ -269,31 +271,10 @@ class Solitaire {
         }
     }
 
-    checkWin() {
-        if(this.foundations.every(f => f.length === 13)) this.winAnim();
-    }
-
-    winAnim() {
-        this.canvas.width = window.innerWidth; this.canvas.height = window.innerHeight;
-        let cards = [];
-        this.foundations.flat().forEach(c => cards.push({...c, x: Math.random()*this.canvas.width, y: 100, vx: (Math.random()-0.5)*15, vy: 2}));
-        const loop = () => {
-            this.ctx.clearRect(0,0,this.canvas.width, this.canvas.height);
-            cards.forEach(c => {
-                c.x += c.vx; c.y += c.vy; c.vy += 0.5;
-                if(c.y > this.canvas.height-112) { c.y = this.canvas.height-112; c.vy *= -0.85; }
-                if(c.x < 0 || c.x > this.canvas.width-80) c.vx *= -1;
-                this.ctx.fillStyle = "white"; this.ctx.fillRect(c.x, c.y, 80, 112);
-                this.ctx.fillStyle = c.color; this.ctx.font = "16px Arial"; this.ctx.fillText(c.val + c.suit, c.x+5, c.y+20);
-            });
-            requestAnimationFrame(loop);
-        };
-        loop();
-    }
+    checkWin() { if(this.foundations.every(f => f.length === 13)) alert("You Win!"); }
 }
 
 const game = new Solitaire();
-
 document.getElementById('stock').onclick = () => {
     game.saveState();
     if(game.stock.length) {
