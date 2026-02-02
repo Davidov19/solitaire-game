@@ -54,10 +54,8 @@
             border-radius: 15px;
             margin-bottom: 25px;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 20px;
             box-shadow: 
                 0 8px 16px rgba(0, 0, 0, 0.6),
                 inset 0 1px 0 rgba(255, 255, 255, 0.1),
@@ -97,41 +95,121 @@
             font-family: 'Courier New', monospace;
         }
 
-        .controls {
+        .bottom-controls {
+            background: linear-gradient(180deg, #3d2817 0%, #6b4423 50%, #3d2817 100%);
+            padding: 15px 25px;
+            border-radius: 15px;
+            margin-top: 25px;
             display: flex;
-            gap: 10px;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 
+                0 8px 16px rgba(0, 0, 0, 0.6),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+            border: 2px solid #2a1810;
+            flex-wrap: wrap;
+        }
+
+        .settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            justify-content: center;
             align-items: center;
         }
 
-        .card-back-selector {
+        .settings-modal.show {
             display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid rgba(212, 175, 55, 0.3);
         }
 
-        .card-back-selector label {
-            font-size: 12px;
+        .settings-content {
+            background: linear-gradient(180deg, #3d2817 0%, #6b4423 50%, #3d2817 100%);
+            padding: 30px;
+            border-radius: 15px;
+            border: 3px solid #d4af37;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .settings-content h2 {
             color: #d4af37;
+            margin-bottom: 25px;
+            font-size: 28px;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .setting-item {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .setting-item label {
+            color: #d4af37;
+            font-size: 14px;
             font-weight: bold;
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
 
-        .card-back-selector select {
-            padding: 6px 10px;
+        .setting-item select {
+            padding: 10px;
             border: 2px solid #8b7355;
-            border-radius: 6px;
+            border-radius: 8px;
             background: linear-gradient(180deg, #f5f5dc 0%, #d2b48c 100%);
             cursor: pointer;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: bold;
             color: #3d2817;
             box-shadow: 
                 0 2px 4px rgba(0, 0, 0, 0.3),
                 inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        }
+
+        .setting-item .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .setting-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .setting-item .checkbox-label {
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .settings-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        .settings-buttons button {
+            flex: 1;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
 
         button {
@@ -532,6 +610,16 @@
             background: linear-gradient(180deg, #e6c758 0%, #d4af37 100%);
         }
 
+        .settings-button {
+            background: linear-gradient(180deg, #4a4a4a 0%, #2d2d2d 100%);
+            border: 2px solid #666;
+            color: #fff;
+        }
+
+        .settings-button:hover {
+            background: linear-gradient(180deg, #5a5a5a 0%, #3d3d3d 100%);
+        }
+
         .card.hint {
             box-shadow: 
                 0 0 0 4px #d4af37,
@@ -567,8 +655,6 @@
 
             .header {
                 padding: 12px 15px;
-                gap: 10px;
-                flex-direction: column;
             }
 
             .stats {
@@ -581,14 +667,14 @@
                 font-size: 22px;
             }
 
+            .bottom-controls {
+                padding: 12px 15px;
+                gap: 8px;
+            }
+
             .controls {
                 width: 100%;
                 flex-wrap: wrap;
-                justify-content: center;
-            }
-
-            .card-back-selector {
-                width: 100%;
                 justify-content: center;
             }
 
@@ -597,6 +683,15 @@
                 font-size: 12px;
                 flex: 1;
                 min-width: 70px;
+            }
+
+            .settings-content {
+                padding: 20px;
+                max-width: 90%;
+            }
+
+            .settings-content h2 {
+                font-size: 24px;
             }
 
             .game-board {
@@ -671,11 +766,6 @@
                 padding: 7px 10px;
             }
 
-            .card-back-selector select {
-                font-size: 11px;
-                padding: 5px 8px;
-            }
-
             .top-row {
                 gap: 5px;
             }
@@ -725,23 +815,6 @@
                     <div class="stat-value" id="moves">0</div>
                 </div>
             </div>
-            <div class="controls">
-                <div class="card-back-selector">
-                    <label for="cardBackSelect">Card Back:</label>
-                    <select id="cardBackSelect" onchange="game.changeCardBack(this.value)">
-                        <option value="default">Default Blue</option>
-                        <option value="classic-red">Classic Red</option>
-                        <option value="classic-blue">Classic Blue</option>
-                        <option value="tropical">Tropical</option>
-                        <option value="space">Space</option>
-                        <option value="mjolnir">Mjolnir</option>
-                    </select>
-                </div>
-                <button onclick="game.newGame()" title="Start a completely new game">New Game</button>
-                <button onclick="game.restart()" title="Restart the current game">Restart</button>
-                <button onclick="game.undo()" title="Undo last move">Undo</button>
-                <button class="hint-button" onclick="game.showHint()" title="Show a possible move">Hint</button>
-            </div>
         </div>
 
         <div class="game-board">
@@ -765,6 +838,45 @@
                     <div class="tableau-pile" id="tableau-5"></div>
                     <div class="tableau-pile" id="tableau-6"></div>
                 </div>
+            </div>
+        </div>
+
+        <div class="bottom-controls">
+            <div class="controls">
+                <button onclick="game.newGame()" title="Start a completely new game">New Game</button>
+                <button onclick="game.restart()" title="Restart the current game">Restart</button>
+                <button onclick="game.undo()" title="Undo last move">Undo</button>
+                <button class="hint-button" onclick="game.showHint()" title="Show a possible move">Hint</button>
+                <button class="settings-button" onclick="game.toggleSettings()" title="Game settings">⚙️ Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-modal" id="settingsModal">
+        <div class="settings-content">
+            <h2>⚙️ Settings</h2>
+            
+            <div class="setting-item">
+                <label for="cardBackSelect">Card Back Design:</label>
+                <select id="cardBackSelect" onchange="game.changeCardBack(this.value)">
+                    <option value="default">Default Blue</option>
+                    <option value="classic-red">Classic Red</option>
+                    <option value="classic-blue">Classic Blue</option>
+                    <option value="tropical">Tropical</option>
+                    <option value="space">Space</option>
+                    <option value="mjolnir">Mjolnir</option>
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <div class="checkbox-container">
+                    <input type="checkbox" id="draw3Toggle" onchange="game.toggleDraw3(this.checked)">
+                    <label for="draw3Toggle" class="checkbox-label">Draw 3 Cards (instead of 1)</label>
+                </div>
+            </div>
+
+            <div class="settings-buttons">
+                <button onclick="game.toggleSettings()">Close</button>
             </div>
         </div>
     </div>
@@ -815,6 +927,7 @@
                 this.draggedCards = null;
                 this.dragSource = null;
                 this.cardBackTheme = 'default';
+                this.draw3Mode = false;
                 
                 this.newGame();
             }
@@ -918,10 +1031,17 @@
 
             drawFromStock() {
                 if (this.stock.length > 0) {
-                    const card = this.stock.pop();
-                    card.faceUp = true;
-                    this.waste.push(card);
-                    this.moveHistory.push({type: 'draw', from: 'stock'});
+                    const cardsToDraw = this.draw3Mode ? Math.min(3, this.stock.length) : 1;
+                    
+                    for (let i = 0; i < cardsToDraw; i++) {
+                        if (this.stock.length > 0) {
+                            const card = this.stock.pop();
+                            card.faceUp = true;
+                            this.waste.push(card);
+                        }
+                    }
+                    
+                    this.moveHistory.push({type: 'draw', from: 'stock', count: cardsToDraw});
                     this.score -= 5;
                 } else if (this.waste.length > 0) {
                     this.stock = this.waste.reverse();
@@ -1058,9 +1178,14 @@
                 const lastMove = this.moveHistory.pop();
 
                 if (lastMove.type === 'draw') {
-                    const card = this.waste.pop();
-                    card.faceUp = false;
-                    this.stock.push(card);
+                    const count = lastMove.count || 1;
+                    for (let i = 0; i < count; i++) {
+                        if (this.waste.length > 0) {
+                            const card = this.waste.pop();
+                            card.faceUp = false;
+                            this.stock.push(card);
+                        }
+                    }
                     this.score += 5;
                 } else if (lastMove.type === 'reset-stock') {
                     this.waste = this.stock.reverse();
@@ -1181,6 +1306,15 @@
                 this.render();
             }
 
+            toggleSettings() {
+                const modal = document.getElementById('settingsModal');
+                modal.classList.toggle('show');
+            }
+
+            toggleDraw3(enabled) {
+                this.draw3Mode = enabled;
+            }
+
             render() {
                 document.getElementById('stock').innerHTML = '';
                 if (this.stock.length > 0) {
@@ -1194,13 +1328,27 @@
 
                 document.getElementById('waste').innerHTML = '';
                 if (this.waste.length > 0) {
-                    const wasteCard = this.createCardElement(this.waste[this.waste.length - 1], true);
-                    wasteCard.style.position = 'absolute';
-                    wasteCard.style.top = '0';
-                    wasteCard.style.left = '0';
-                    wasteCard.dataset.source = 'waste';
-                    this.addCardInteraction(wasteCard, this.waste[this.waste.length - 1], 'waste', 0);
-                    document.getElementById('waste').appendChild(wasteCard);
+                    // Show up to 3 cards in waste pile for visual feedback
+                    const cardsToShow = this.draw3Mode ? Math.min(3, this.waste.length) : 1;
+                    const startIndex = Math.max(0, this.waste.length - cardsToShow);
+                    
+                    for (let i = startIndex; i < this.waste.length; i++) {
+                        const card = this.waste[i];
+                        const wasteCard = this.createCardElement(card, true);
+                        wasteCard.style.position = 'absolute';
+                        wasteCard.style.top = '0';
+                        wasteCard.style.left = `${(i - startIndex) * 20}px`;
+                        wasteCard.dataset.source = 'waste';
+                        
+                        // Only the top card is interactive
+                        if (i === this.waste.length - 1) {
+                            this.addCardInteraction(wasteCard, card, 'waste', 0);
+                        } else {
+                            wasteCard.style.cursor = 'default';
+                        }
+                        
+                        document.getElementById('waste').appendChild(wasteCard);
+                    }
                 }
 
                 for (let i = 0; i < 4; i++) {
