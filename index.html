@@ -1,24 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solitaire JS</title>
+    <style>
+        :root {
+            --green: #2e7d32;
+            --card-width: clamp(45px, 12vw, 100px);
+            --card-height: calc(var(--card-width) * 1.4);
+        }
+        body {
+            background-color: var(--green);
+            font-family: sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+            user-select: none;
+            overflow-x: hidden;
+        }
+        #game-container {
+            width: 100%;
+            max-width: 800px;
+            padding: 10px;
+            display: grid;
+            grid-template-rows: auto auto;
+            gap: 20px;
+        }
+        .row {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .pile {
+            width: var(--card-width);
+            height: var(--card-height);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            position: relative;
+        }
+        .card {
+            width: var(--card-width);
+            height: var(--card-height);
+            background: white;
+            border-radius: 8px;
+            position: absolute;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 5px;
+            box-sizing: border-box;
+            color: black;
+            font-weight: bold;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+        .card.back {
+            background: #1565c0;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.1) 5px, rgba(255,255,255,0.1) 10px);
+            border: 2px solid white;
+        }
+        .card.red { color: #d32f2f; }
+        .tableau-pile { height: 400px; border: none; }
+        .dragging { opacity: 0.5; z-index: 1000; }
+        #stats { margin: 10px; font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+
+    <div id="stats">Solitaire</div>
+    <div id="game-container">
+        <div class="row">
+            <div style="display: flex; gap: 10px;">
+                <div id="stock" class="pile"></div>
+                <div id="waste" class="pile"></div>
+            </div>
+            <div id="foundations" style="display: flex; gap: 10px;">
+                <div class="pile foundation" data-idx="0"></div>
+                <div class="pile foundation" data-idx="1"></div>
+                <div class="pile foundation" data-idx="2"></div>
+                <div class="pile foundation" data-idx="3"></div>
+            </div>
+        </div>
+        <div id="tableau" class="row">
+            <div class="pile tableau-pile" data-idx="0"></div>
+            <div class="pile tableau-pile" data-idx="1"></div>
+            <div class="pile tableau-pile" data-idx="2"></div>
+            <div class="pile tableau-pile" data-idx="3"></div>
+            <div class="pile tableau-pile" data-idx="4"></div>
+            <div class="pile tableau-pile" data-idx="5"></div>
+            <div class="pile tableau-pile" data-idx="6"></div>
+        </div>
+    </div>
+
+<script>
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+const SUITS = ['♠', '♣', '♥', '♦'];
+const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
 class SolitaireGame {
     constructor() {
-        this.stock = [];
-        this.waste = [];
-        this.tableau = Array.from({ length: 7 }, () => []);
-        this.foundations = Array.from({ length: 4 }, () => []);
-
-        this.draggedCards = null;
-        this.dragSource = null;
-
-        // Mobile / auto-complete state
-        this.longPressTimer = null;
-        this.touchDragging = false;
-        this.autoCompleteTimer = null;
-
         this.initGame();
     }
 
-    /* ===================== AUTO MOVE ===================== */
+    initGame() {
+        const deck = [];
+        SUITS.forEach(suit => {
+            VALUES.forEach((val, i) => {
+                deck.push({ suit, value: val, rank: i + 1, color: (suit === '♥' || suit === '♦') ? 'red' : 'black', faceUp: false });
+            });
+        });
+        
+        // Shuffle
+        for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
+
+        this.stock = deck;
+        this.waste = [];
+        this.foundations = [[], [], [], []];
+        this.tableau = [[], [], [], [], [], [], []];
+        
+        // Deal tableau
+        for (let i = 0; i < 7; i++) {
+            for (let j = i; j < 7; j++) {
+                const card = this.stock.pop();
+                if (i === j) card.faceUp = true;
+                this.tableau[j].push(card);
+            }
+        }
+
+        this.render();
+    }
+
+    render() {
+        this.renderPile('stock', this.stock, 'stock');
+        this.renderPile('waste', this.waste, 'waste');
+        this.foundations.forEach((f, i) => this.renderPile(`foundations .pile[data-idx="${i}"]`, f, 'foundation', i));
+        this.tableau.forEach((t, i) => this.renderPile(`tableau .pile[data-idx="${i}"]`, t, 'tableau', i));
+    }
+
+    renderPile(selector, cards, type, pileIdx) {
+        const container = document.querySelector(`#${selector.includes(' ') ? selector : selector}`);
+        if (!container) return;
+        container.innerHTML = '';
+        
+        // Add drop zone
+        this.addDropZone(container, type, pileIdx);
+
+        cards.forEach((card, i) => {
+            const cardEl = document.createElement('div');
+            cardEl.className = `card ${card.faceUp ? card.color : 'back'}`;
+            if (card.faceUp) {
+                cardEl.innerHTML = `<div>${card.value}</div><div>${card.suit}</div>`;
+                this.addCardInteraction(cardEl, card, type, pileIdx, i);
+            }
+            if (type === 'tableau') cardEl.style.top = `${i * 20}px`;
+            container.appendChild(cardEl);
+        });
+    }
+
+    /* Logic Helpers */
+    canPlaceOnFoundation(card, fIdx) {
+        const target = this.foundations[fIdx];
+        if (target.length === 0) return card.rank === 1;
+        const top = target[target.length - 1];
+        return card.suit === top.suit && card.rank === top.rank + 1;
+    }
+
+    canPlaceOnTableau(card, tIdx) {
+        const target = this.tableau[tIdx];
+        if (target.length === 0) return card.rank === 13;
+        const top = target[target.length - 1];
+        return card.color !== top.color && card.rank === top.rank - 1;
+    }
+
+    moveCards(cards, srcType, srcIdx, destType, destIdx) {
+        const source = srcType === 'tableau' ? this.tableau[srcIdx] : srcType === 'waste' ? this.waste : null;
+        const dest = destType === 'tableau' ? this.tableau[destIdx] : this.foundations[destIdx];
+        
+        if (source) {
+            const moved = source.splice(source.length - cards.length);
+            dest.push(...moved);
+            if (source.length > 0) source[source.length - 1].faceUp = true;
+            this.render();
+            this.startAutoComplete();
+        }
+    }
+
+    /* ===================== USER INTERACTION ===================== */
+    addCardInteraction(cardEl, card, sourceType, sourceIndex, cardIndex) {
+        cardEl.draggable = true;
+        cardEl.dataset.cardIndex = cardIndex;
+
+        cardEl.addEventListener('dragstart', (e) => {
+            this.draggedCards = sourceType === 'tableau' ? this.tableau[sourceIndex].slice(cardIndex) : [card];
+            this.dragSource = { type: sourceType, index: sourceIndex };
+        });
+
+        cardEl.addEventListener('dblclick', () => {
+            this.autoMoveCard(card, sourceType, sourceIndex);
+        });
+    }
+
+    addDropZone(el, destType, destIndex) {
+        el.addEventListener('dragover', (e) => e.preventDefault());
+        el.addEventListener('drop', () => {
+            if (!this.draggedCards) return;
+            const card = this.draggedCards[0];
+            let valid = (destType === 'foundation' && this.draggedCards.length === 1 && this.canPlaceOnFoundation(card, destIndex)) ||
+                        (destType === 'tableau' && this.canPlaceOnTableau(card, destIndex));
+            
+            if (valid) this.moveCards(this.draggedCards, this.dragSource.type, this.dragSource.index, destType, destIndex);
+        });
+    }
+
     autoMoveCard(card, sourceType, sourceIndex) {
         for (let i = 0; i < 4; i++) {
             if (this.canPlaceOnFoundation(card, i)) {
@@ -26,147 +226,30 @@ class SolitaireGame {
                 return true;
             }
         }
-
-        for (let i = 0; i < 7; i++) {
-            if (this.canPlaceOnTableau(card, i)) {
-                this.moveCards([card], sourceType, sourceIndex, 'tableau', i);
-                return true;
-            }
-        }
         return false;
     }
 
-    /* ===================== AUTO COMPLETE ===================== */
-    canAutoComplete() {
-        if (this.stock.length || this.waste.length) return false;
-        return this.tableau.every(p => p.every(c => c.faceUp));
-    }
-
     startAutoComplete() {
-        if (!this.canAutoComplete() || this.autoCompleteTimer) return;
-
-        this.autoCompleteTimer = setInterval(() => {
-            let moved = false;
-
-            for (let t = 0; t < 7 && !moved; t++) {
-                const pile = this.tableau[t];
-                if (!pile.length) continue;
-
-                const card = pile[pile.length - 1];
-                for (let f = 0; f < 4; f++) {
-                    if (this.canPlaceOnFoundation(card, f)) {
-                        this.moveCards([card], 'tableau', t, 'foundation', f);
-                        moved = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!moved) {
-                clearInterval(this.autoCompleteTimer);
-                this.autoCompleteTimer = null;
-            }
-
-            this.render();
-            this.updateStats();
-        }, 250);
+        if (!this.tableau.every(p => p.every(c => c.faceUp)) || this.stock.length > 0) return;
+        // Basic auto-solver logic could go here
     }
+}
 
-    /* ===================== CARD INTERACTION ===================== */
-    addCardInteraction(cardEl, card, sourceType, sourceIndex) {
-
-        // ---------- DESKTOP ----------
-        if (!IS_TOUCH) {
-            cardEl.draggable = true;
-
-            cardEl.addEventListener('dragstart', () => {
-                const idx = Number(cardEl.dataset.cardIndex) || 0;
-                this.draggedCards =
-                    sourceType === 'tableau'
-                        ? this.tableau[sourceIndex].slice(idx)
-                        : [card];
-                this.dragSource = { type: sourceType, index: sourceIndex };
-                cardEl.classList.add('dragging');
-            });
-
-            cardEl.addEventListener('dragend', () => {
-                cardEl.classList.remove('dragging');
-                this.draggedCards = null;
-                this.dragSource = null;
-            });
-
-            cardEl.addEventListener('dblclick', () => {
-                if (this.autoMoveCard(card, sourceType, sourceIndex)) {
-                    this.render();
-                    this.updateStats();
-                    this.startAutoComplete();
-                }
-            });
-            return;
-        }
-
-        // ---------- MOBILE ----------
-        cardEl.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (this.autoMoveCard(card, sourceType, sourceIndex)) {
-                this.render();
-                this.updateStats();
-                this.startAutoComplete();
-            }
-        });
-
-        cardEl.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-
-            const idx = Number(cardEl.dataset.cardIndex) || 0;
-            const touch = e.touches[0];
-            const startX = touch.clientX;
-            const startY = touch.clientY;
-
-            this.longPressTimer = setTimeout(() => {
-                this.touchDragging = true;
-                this.draggedCards =
-                    sourceType === 'tableau'
-                        ? this.tableau[sourceIndex].slice(idx)
-                        : [card];
-                this.dragSource = { type: sourceType, index: sourceIndex };
-                cardEl.classList.add('dragging');
-            }, 350);
-
-            const move = (me) => {
-                if (!this.touchDragging) return;
-                const t = me.touches[0];
-                cardEl.style.transform =
-                    `translate(${t.clientX - startX}px, ${t.clientY - startY}px) scale(1.05)`;
-                cardEl.style.zIndex = 999;
-            };
-
-            const end = () => {
-                clearTimeout(this.longPressTimer);
-                cardEl.style.transform = '';
-                cardEl.style.zIndex = '';
-                cardEl.classList.remove('dragging');
-                this.touchDragging = false;
-                this.draggedCards = null;
-                this.dragSource = null;
-                document.removeEventListener('touchmove', move);
-                document.removeEventListener('touchend', end);
-            };
-
-            document.addEventListener('touchmove', move);
-            document.addEventListener('touchend', end);
-        });
+// Draw from stock event
+document.getElementById('stock').addEventListener('click', () => {
+    const game = window.solitaire;
+    if (game.stock.length > 0) {
+        const card = game.stock.pop();
+        card.faceUp = true;
+        game.waste.push(card);
+    } else {
+        game.stock = game.waste.reverse().map(c => ({...c, faceUp: false}));
+        game.waste = [];
     }
+    game.render();
+});
 
-    /* ===================== DROP ZONES ===================== */
-    addDropZone(el, destType, destIndex) {
-        const attemptDrop = () => {
-            if (!this.draggedCards || !this.dragSource) return;
-
-            const card = this.draggedCards[0];
-            let valid = false;
-
-            if (destType === 'foundation' && this.draggedCards.length === 1) {
-                valid = this.canPlaceOnFoundation(card, destIndex);
-            } else if (destType === 'tableau') {
-                valid = this.tableau[destIndex].length === 0
+window.solitaire = new SolitaireGame();
+</script>
+</body>
+</html>
