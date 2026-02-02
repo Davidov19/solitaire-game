@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Solitaire</title>
     <style>
         * {
@@ -552,6 +552,158 @@
                     0 0 0 6px #d4af37,
                     0 0 30px rgba(212, 175, 55, 1),
                     0 10px 25px rgba(0, 0, 0, 0.6);
+            }
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                max-width: 100%;
+            }
+
+            .header {
+                padding: 12px 15px;
+                gap: 10px;
+                flex-direction: column;
+            }
+
+            .stats {
+                gap: 15px;
+                width: 100%;
+                justify-content: space-around;
+            }
+
+            .stat-value {
+                font-size: 22px;
+            }
+
+            .controls {
+                width: 100%;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .card-back-selector {
+                width: 100%;
+                justify-content: center;
+            }
+
+            button {
+                padding: 8px 12px;
+                font-size: 12px;
+                flex: 1;
+                min-width: 70px;
+            }
+
+            .game-board {
+                padding: 15px 5px;
+            }
+
+            .board-container {
+                gap: 40px;
+            }
+
+            .top-row {
+                gap: 8px;
+            }
+
+            .tableau {
+                gap: 8px;
+            }
+
+            .card-pile,
+            .tableau-pile,
+            .top-pile-spacer {
+                width: 50px;
+                height: 70px;
+            }
+
+            .card {
+                width: 50px;
+                height: 70px;
+                padding: 4px;
+                border-radius: 6px;
+            }
+
+            .card-top,
+            .card-bottom {
+                font-size: 11px;
+            }
+
+            .card-center {
+                font-size: 20px;
+            }
+
+            .card:hover {
+                transform: translateY(-4px) scale(1.02);
+            }
+
+            .win-message {
+                padding: 30px 20px;
+                width: 90%;
+                max-width: 350px;
+            }
+
+            .win-message h2 {
+                font-size: 28px;
+            }
+
+            .win-message p {
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stat-value {
+                font-size: 18px;
+            }
+
+            .stat-label {
+                font-size: 9px;
+            }
+
+            button {
+                font-size: 11px;
+                padding: 7px 10px;
+            }
+
+            .card-back-selector select {
+                font-size: 11px;
+                padding: 5px 8px;
+            }
+
+            .top-row {
+                gap: 5px;
+            }
+
+            .tableau {
+                gap: 5px;
+            }
+
+            .card-pile,
+            .tableau-pile,
+            .top-pile-spacer {
+                width: 42px;
+                height: 58px;
+            }
+
+            .card {
+                width: 42px;
+                height: 58px;
+                padding: 3px;
+            }
+
+            .card-top,
+            .card-bottom {
+                font-size: 9px;
+            }
+
+            .card-center {
+                font-size: 16px;
             }
         }
     </style>
@@ -1137,11 +1289,86 @@
                     this.dragSource = null;
                 });
 
+                // Smart double-tap/double-click to auto-move
                 cardEl.addEventListener('dblclick', () => {
-                    this.moveToFoundation(card, sourceType, sourceIndex);
-                    this.render();
-                    this.updateStats();
+                    this.autoMoveCard(card, sourceType, sourceIndex);
                 });
+
+                // Handle touch events for mobile double-tap
+                let lastTap = 0;
+                cardEl.addEventListener('touchend', (e) => {
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTap;
+                    if (tapLength < 500 && tapLength > 0) {
+                        e.preventDefault();
+                        this.autoMoveCard(card, sourceType, sourceIndex);
+                    }
+                    lastTap = currentTime;
+                });
+            }
+
+            autoMoveCard(card, sourceType, sourceIndex) {
+                // Get the index of this card in its pile
+                let cardIndex = 0;
+                if (sourceType === 'tableau') {
+                    cardIndex = this.tableau[sourceIndex].indexOf(card);
+                }
+
+                // For tableau cards, only move if it's the last card or moving a sequence
+                if (sourceType === 'tableau') {
+                    const pile = this.tableau[sourceIndex];
+                    const cardsToMove = pile.slice(cardIndex);
+                    
+                    // If moving single card, try foundation first
+                    if (cardsToMove.length === 1) {
+                        // Try to move to foundation
+                        if (this.moveToFoundation(card, sourceType, sourceIndex)) {
+                            this.render();
+                            this.updateStats();
+                            return;
+                        }
+                    }
+                    
+                    // Try to move to tableau
+                    for (let i = 0; i < this.tableau.length; i++) {
+                        if (i !== sourceIndex && this.canPlaceOnTableau(card, i)) {
+                            if (this.moveCards(cardsToMove, sourceType, sourceIndex, 'tableau', i)) {
+                                this.render();
+                                this.updateStats();
+                                return;
+                            }
+                        }
+                    }
+                } else if (sourceType === 'waste') {
+                    // Try foundation first
+                    if (this.moveToFoundation(card, sourceType, sourceIndex)) {
+                        this.render();
+                        this.updateStats();
+                        return;
+                    }
+                    
+                    // Try tableau
+                    for (let i = 0; i < this.tableau.length; i++) {
+                        if (this.canPlaceOnTableau(card, i)) {
+                            if (this.moveCards([card], sourceType, sourceIndex, 'tableau', i)) {
+                                this.render();
+                                this.updateStats();
+                                return;
+                            }
+                        }
+                    }
+                } else if (sourceType === 'foundation') {
+                    // Move from foundation to tableau
+                    for (let i = 0; i < this.tableau.length; i++) {
+                        if (this.canPlaceOnTableau(card, i)) {
+                            if (this.moveCards([card], sourceType, sourceIndex, 'tableau', i)) {
+                                this.render();
+                                this.updateStats();
+                                return;
+                            }
+                        }
+                    }
+                }
             }
 
             addDropZone(element, destType, destIndex) {
