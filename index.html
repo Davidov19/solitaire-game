@@ -171,22 +171,26 @@
             padding: 30px 20px;
             border-radius: 15px;
             min-height: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .board-container {
+            display: flex;
+            flex-direction: column;
+            gap: 60px;
         }
 
         .top-row {
             display: flex;
-            justify-content: space-between;
-            margin-bottom: 60px;
-        }
-
-        .left-section {
-            display: flex;
             gap: 20px;
         }
 
-        .foundation-piles {
-            display: flex;
-            gap: 20px;
+        .top-pile-spacer {
+            width: 80px;
+            height: 110px;
+            visibility: hidden;
         }
 
         .card-pile {
@@ -589,27 +593,26 @@
         </div>
 
         <div class="game-board">
-            <div class="top-row">
-                <div class="left-section">
+            <div class="board-container">
+                <div class="top-row">
                     <div class="card-pile stock-pile" id="stock" onclick="game.drawFromStock()"></div>
                     <div class="card-pile" id="waste"></div>
-                </div>
-                <div class="foundation-piles">
+                    <div class="top-pile-spacer"></div>
                     <div class="card-pile foundation" id="foundation-0"></div>
                     <div class="card-pile foundation" id="foundation-1"></div>
                     <div class="card-pile foundation" id="foundation-2"></div>
                     <div class="card-pile foundation" id="foundation-3"></div>
                 </div>
-            </div>
 
-            <div class="tableau">
-                <div class="tableau-pile" id="tableau-0"></div>
-                <div class="tableau-pile" id="tableau-1"></div>
-                <div class="tableau-pile" id="tableau-2"></div>
-                <div class="tableau-pile" id="tableau-3"></div>
-                <div class="tableau-pile" id="tableau-4"></div>
-                <div class="tableau-pile" id="tableau-5"></div>
-                <div class="tableau-pile" id="tableau-6"></div>
+                <div class="tableau">
+                    <div class="tableau-pile" id="tableau-0"></div>
+                    <div class="tableau-pile" id="tableau-1"></div>
+                    <div class="tableau-pile" id="tableau-2"></div>
+                    <div class="tableau-pile" id="tableau-3"></div>
+                    <div class="tableau-pile" id="tableau-4"></div>
+                    <div class="tableau-pile" id="tableau-5"></div>
+                    <div class="tableau-pile" id="tableau-6"></div>
+                </div>
             </div>
         </div>
     </div>
